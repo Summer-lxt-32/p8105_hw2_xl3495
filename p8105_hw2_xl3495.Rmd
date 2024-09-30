@@ -1,0 +1,15 @@
+---
+title: "p8105_hw2_xl3495"
+author: "Xueting Li"
+date: "2024-09-30"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+
+
+
