@@ -5,9 +5,99 @@ date: "2024-09-30"
 output: github_document
 ---
 
-```{r}
+```{r setup, echo = FALSE, message = FALSE}
 library(tidyverse)
+library(readxl)
+library(haven)
 ```
+
+# Problem 1
+
+```{r}
+nyc_subway_df = 
+  read_csv("datasets/NYC_Transit_Subway_Entrance_And_Exit_Data.csv", na = c("NA",".","")) |>
+  janitor::clean_names() |>
+  select(line, station_name, station_latitude, station_longitude, route1:route11, entrance_type, entry, vending, ada) |>
+  mutate(
+    entry = case_match(
+    entry,
+    "YES" ~ TRUE,
+    "NO" ~ FALSE)
+)
+  
+```
+## Description
+So far, the dataset contains 19 variables:  
+  
+`line`: `<chr>`, describes the line setting;  
+`station_name`: `<chr>`, describes the name of the station;  
+`station_latitude` \& `station_longitude`: `<dbl>`, describe the location of the station;  
+`route1`--`route11`: `<chr>`, describe how many and what routes are going to pass the station;  
+`entrance_type`: `<chr>`, describes the way to enter;  
+`entry`: `<lgl>`, describes whether the entry is in use;  
+`vending`: `<chr>`, describes whether there is a vending machine;  
+`ada`: `<lgl>`, describes whether there is an ADA compliance.  
+  
+I cleaned this dataset by 4 steps so far.  
+1.  Read the dataset and substitute all possible blank values using `NA`.
+2.  Convert all variable names to lowercase with underline substituting blank space.
+3.  Select all required columns using `select()` function.
+4.  Inside `mutate()` function, convert `entry` variable type from `<chr>` to `<lgl>` by setting 'YES' to `TRUE`, 'NO' to `FALSE` using `case_match()` function.  
+
+```{r}
+col = ncol(nyc_subway_df)
+row = nrow(nyc_subway_df)
+```
+
+Now the dataset is cleaned to `r row` \times `r col`. But it's not tidy enough since there exists some repeated rows and columns from `route1` to `route11` are multifarious and redundant to read.
+
+```{r}
+num_stations = nrow(distinct(nyc_subway_df, line, station_name))
+num_ada = nrow(filter(nyc_subway_df, ada == TRUE) |>
+                 distinct(line, station_name))
+num_entrance = nrow(filter(nyc_subway_df, vending == "NO") |>
+                      filter(entry == TRUE) |>
+                      distinct(line, station_name))
+proportion_entrance = num_entrance/num_stations*100
+```
+
+In total, there are `r num_stations` distince stations, and `r num_ada` of them are ADA compliant, and `r format(proportion_entrance, nsmall = 2)\%` of station entrances / exits without vending allow entrance.
+
+```{r}
+A_df = nyc_subway_df |>
+  mutate(
+    across(route1:route11, ~ as.character(.))
+  ) |>
+  pivot_longer(cols = route1:route11,
+                    names_to = "route_names",
+                    values_to = "route_numbers") |>
+  filter(route_numbers == "A")
+  
+num_A_stations = A_df |>
+  distinct(line, station_name) |>
+  nrow()
+
+num_A_ada = A_df |>
+  filter(ada == TRUE) |>
+  distinct(line, station_name) |>
+  nrow()
+
+```
+
+From above, `r num_A_stations` distinct stations serve the A train. Of the stations that serve the A train, `r num_A_ada` are ADA compliant.
+
+
+# Problem 2
+
+```{r}
+
+```
+
+
+
+
+
+
 
 
 
