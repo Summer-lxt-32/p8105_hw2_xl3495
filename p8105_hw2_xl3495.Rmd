@@ -157,6 +157,13 @@ num_gwynnda_cigarette = sum(gwynnda_cigarette, na.rm = TRUE)
 From above, the total weight of trash collected by Professor Trash Wheel is `r prof_weight_trash`. The total number of cigarette butts collected by Gwynnda in June of 2022 is `r num_gwynnda_cigarette`.
 
 # Problem 3
+```{r message=FALSE}
+gbb_bakers = read_csv("datasets/bakers.csv", na = c("N/A",".",""))
+
+gbb_bakes = read_csv("datasets/bakes.csv", na = c("N/A",".",""))
+
+gbb_results = read_csv("datasets/results.csv", na = c("NA",".",""), skip = 2)
+```
 
 
 
