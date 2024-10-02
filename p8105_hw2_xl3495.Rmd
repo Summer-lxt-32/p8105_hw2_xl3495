@@ -59,9 +59,10 @@ num_entrance = nrow(filter(nyc_subway_df, vending == "NO") |>
                       filter(entry == TRUE) |>
                       distinct(line, station_name))
 proportion_entrance = num_entrance/num_stations*100
+proportion_entrance = format(proportion_entrance, nsmall = 2)
 ```
 
-In total, there are `r num_stations` distince stations, and `r num_ada` of them are ADA compliant, and `r format(proportion_entrance, nsmall = 2)\%` of station entrances / exits without vending allow entrance.
+In total, there are `r num_stations` distince stations, and `r num_ada` of them are ADA compliant, and `r proportion_entrance%` of station entrances / exits without vending allow entrance.
 
 ```{r}
 A_df = nyc_subway_df |>
@@ -90,6 +91,45 @@ From above, `r num_A_stations` distinct stations serve the A train. Of the stati
 # Problem 2
 
 ```{r}
+trash_wheel_df = 
+  read_excel("datasets/202409\ Trash\ Wheel\ Collection\ Data.xlsx", sheet = "Mr. Trash Wheel" , skip = 1, n_max = 651) |>
+  janitor::clean_names() |>
+  filter(is.na(dumpster) == FALSE) |>
+  mutate(
+    sports_balls = round(sports_balls) |>
+      as.integer()
+  )
+
+prof_trash_wheel_df = 
+  read_excel("datasets/202409\ Trash\ Wheel\ Collection\ Data.xlsx", sheet = "Professor Trash Wheel" , skip = 1, n_max = 118) |>
+  janitor::clean_names() |>
+  filter(is.na(dumpster) == FALSE)
+
+gwynnda_trash_wheel_df = 
+  read_excel("datasets/202409\ Trash\ Wheel\ Collection\ Data.xlsx", sheet = "Gwynnda Trash Wheel" , skip = 1, n_max = 264) |>
+  janitor::clean_names() |>
+  filter(is.na(dumpster) == FALSE)
+
+mr_df = trash_wheel_df |>
+  mutate(trash_wheel = 
+           paste("mr", as.character(dumpster), sep = "_")) |>
+  mutate(year = as.double(year)) |>
+  relocate(trash_wheel) |>
+  select(-dumpster)
+
+prof_df = prof_trash_wheel_df |> 
+  mutate(trash_wheel = 
+           paste("prof", as.character(dumpster), sep = "_")) |>
+  relocate(trash_wheel) |>
+  select(-dumpster)
+
+gwynnda_df = gwynnda_trash_wheel_df |>
+  mutate(trash_wheel = 
+           paste("gwynnda", as.character(dumpster), sep = "_")) |>
+  relocate(trash_wheel) |>
+  select(-dumpster)
+
+combined_df = bind_rows(mr_df, prof_df, gwynnda_df)
 
 ```
 
