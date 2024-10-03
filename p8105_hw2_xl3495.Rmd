@@ -5,7 +5,7 @@ date: "2024-09-30"
 output: github_document
 ---
 
-```{r setup, echo = FALSE, message = FALSE}
+```{r message = FALSE}
 library(tidyverse)
 library(readxl)
 library(haven)
@@ -13,7 +13,7 @@ library(haven)
 
 # Problem 1
 
-```{r}
+```{r message=FALSE}
 nyc_subway_df = 
   read_csv("datasets/NYC_Transit_Subway_Entrance_And_Exit_Data.csv", na = c("NA",".","")) |>
   janitor::clean_names() |>
@@ -24,7 +24,8 @@ nyc_subway_df =
     "YES" ~ TRUE,
     "NO" ~ FALSE)
 )
-  
+
+head(nyc_subway_df)
 ```
 ## Description
 So far, the dataset contains 19 variables:  
@@ -52,14 +53,23 @@ row = nrow(nyc_subway_df)
 Now the dataset is cleaned to `r row` \times `r col`. But it's not tidy enough since there exists some repeated rows and columns from `route1` to `route11` are multifarious and redundant to read.
 
 ```{r}
-num_stations = nrow(distinct(nyc_subway_df, line, station_name))
-num_ada = nrow(filter(nyc_subway_df, ada == TRUE) |>
-                 distinct(line, station_name))
-num_entrance = nrow(filter(nyc_subway_df, vending == "NO") |>
-                      filter(entry == TRUE) |>
-                      distinct(line, station_name))
+num_stations = nyc_subway_df |>
+  distinct(line, station_name) |>
+  nrow()
+
+num_ada = nyc_subway_df |>
+  filter(ada == TRUE) |>
+  distinct(line, station_name) |>
+  nrow()
+
+num_entrance = nyc_subway_df |>
+  filter(vending == "NO") |>
+  filter(entry == TRUE) |>
+  distinct(line, station_name) |>
+  nrow()
+
 proportion_entrance = num_entrance/num_stations*100
-proportion_entrance = paste(format(proportion_entrance, nsmall = 2), "%")
+proportion_entrance = paste(round(proportion_entrance, 2), "%")
 ```
 
 In total, there are `r num_stations` distinct stations, and `r num_ada` of them are ADA compliant, and `r proportion_entrance` of station entrances / exits without vending allow entrance.
@@ -135,6 +145,8 @@ combined_df = bind_rows(mr_df, prof_df, gwynnda_df) |>
   select(-month, -year, -x15, -x16)
 
 size = nrow(combined_df)
+
+head(combined_df)
 ```
 
 ## Description
@@ -142,15 +154,15 @@ In total, there are `r size` observations of data. This combined dataframe conta
 Take the first row as an example, `Mr. Trash Wheel -- dumpster 1` has dealt with 4.31 tons of trash until 2014-05-16, which takes 18 cubic yards. Among the trash, 1450 are plastic bottles, 72 are glass bottles, etc (here I didn't include all trash types). No power was recorded.
 
 ```{r}
-prof_weight = prof_df |>
-  select(weight_tons)
-prof_weight_trash = sum(prof_weight, na.rm = TRUE)
+prof_weight_trash = prof_df |>
+  pull(weight_tons) |>
+  sum(na.rm = TRUE)
 
-gwynnda_cigarette = 
+num_gwynnda_cigarette = 
   gwynnda_trash_wheel_df |>
   filter(month == "June", year == "2022") |>
-  select(cigarette_butts)
-num_gwynnda_cigarette = sum(gwynnda_cigarette, na.rm = TRUE)
+  pull(cigarette_butts) |>
+  sum(na.rm = TRUE)
 
 ```
 
@@ -158,18 +170,117 @@ From above, the total weight of trash collected by Professor Trash Wheel is `r p
 
 # Problem 3
 ```{r message=FALSE}
-gbb_bakers = read_csv("datasets/bakers.csv", na = c("N/A",".",""))
+gbb_bakers = read_csv("datasets/bakers.csv", na = c("N/A",".","")) |>
+  janitor::clean_names() |>
+  mutate(
+    baker = sub(" .*", "", baker_name)) |>
+  relocate(baker, baker_name) |>
+  arrange(series)
 
-gbb_bakes = read_csv("datasets/bakes.csv", na = c("N/A",".",""))
+gbb_bakes = read_csv("datasets/bakes.csv", na = c("N/A","UNKNOWN","")) |>
+  janitor::clean_names() |>
+  arrange(series, episode)
 
-gbb_results = read_csv("datasets/results.csv", na = c("NA",".",""), skip = 2)
+gbb_results = read_csv("datasets/results.csv", na = c("NA",".",""), skip = 2) |>
+  janitor::clean_names() |>
+  arrange(series, episode)
+
+test_df_1 = anti_join(gbb_bakes, gbb_results)
+test_df_2 = anti_join(gbb_results, gbb_bakes)
+test_df_3 = anti_join(gbb_bakers, gbb_bakes)
+test_df_4 = anti_join(gbb_bakes, gbb_bakers)
+
+test_df_5 = gbb_bakes |>
+  filter(baker == "\"Jo\"")
+
+gbb_bakes = gbb_bakes |>
+  mutate(baker = if_else(baker == "\"Jo\"", "Jo", baker))
+
+
+
+bake_result_df = full_join(gbb_bakes, gbb_results, by = c("baker", "series", "episode"))
+
+#check if there is an unknown person
+num_unknown = bake_result_df |>
+  filter(is.na(baker)==TRUE) |>
+  nrow()
+
+# evaluate the duplicates
+duplicate_bakers = bake_result_df |>
+  group_by(baker, series, episode) |>
+  filter(n() > 1) |>
+  nrow()
+
+final_df = full_join(gbb_bakers, bake_result_df, by = c("baker", "series")) |>
+  select(-baker) |>
+  relocate(series, .before = episode) |>
+  filter((is.na(result)==FALSE) | (baker_name == "Jo Wheatley"))
+
+```
+
+## Cleaning Process
+**First**, I read three `csv` documents and in order to inspect if they have shared common variables to combine, I converted their variable names into lowercase with underlines in `gbb_bakers`, `gbb_bakes`, `gbb_results`. Then the similar columns I found are:  
+`gbb_bakers`: `baker_name`, `series`;  
+`gbb_bakes`: `baker`, `series`, `episode` (shared with only `gbb_results`);  
+`gbb_results`: `baker`, `series`, `episode`.  
+One thing needs to be specific is that in the `results.csv` document, there are some notes for variable explanations, so I skipped the first two lines. And looking at these original `csv` files, I found their `na` values are not consistent, so I made the all `NA` when read.  
+  
+**Second**, I noticed that although the columns I found are similar, there still exist some differences. For specific, in `gbb_bakers`, bakers are recorded by their full names, while they are called by their first name in the other two. So I used `mutate()` function to add a new column called `baker` in `gbb_bakers` dataframe to record their first names, which was extracted by `sub()` function. But `baker_name` was still preserved for complete information of full names. Here, I also reordered the three dataframes in the order of `series` and `episode` for convenience in comparing if the observation matched each other.  
+  
+Here, a strange person called **Jo Wheatley** appears. This was found by `anti_join()` function with my 5 `test_df_`s. She has her name on `bakers.csv` and mistakenly put a `""` sign on `bakes.csv`. On `bakes.csv`, it shows that she made through 8 episodes and clearly recorded the bakery's name, but the information of her results turned out to be missing. I guess she has survived through Series 2, otherwise there would not be a record for her bakeries. So, I only revised the name in `gbb_bakes` by `mutate()` function and kept all information using `full_join()` function, which will be explained below.
+  
+**Third**, since the `gbb_bakes` and `gbb_results` have same variables: `baker`, `series`, `episode`, I tried to combine them first. And to preserve as much information as possible, I chose the `full_join()` function here to keep all information for each observation.
+```{r}
+head(bake_result_df, 10)
+```
+To check if there is a person has no name recorded, I introduced `num_unknown` by `filter()` function to find if there is an `NA` value, and it turns out to be `r num_unknown`. To check if there is a duplicated observation for the same individual, I used `groupby()` function to check if there is a person appeared in the same series and same episode but different observations, and it also turned out to be `r duplicate_bakers`.  
+  
+**Finally and similarly**, I applied `full_join()` function to `gbb_bakers` and `bake_result_df`. Since the information of first name is included in `baker_name`, I deleted the column `baker` I used for combination and used `relocate()` function to make the dataframe more readable. Furthermore, I found that if a person's result is `"OUT"`, there won't be any information in the next few episodes. So, I used `filter()` function to choose those observations with a `non-NA` result value. What is interesting is that **Jo Wheatley** has no results but for reasons above I want to keep it, so I filter her out as well. The final dataframe is like:
+
+```{r}
+head(final_df, 10)
 ```
 
 
+## Description
+According to the final dataframe, all participants with at least one episode survived were kept. There are `r nrow(final_df)` observations in total. Each observation records the `baker_name`, `baker_age`, `baker_occupation`, `hometown`, and for each `series` and `episode`, what bakery the baker made (`signature_bake`,`show_stopper`) with the `technical` level and `result`.
 
+## Table
+```{r}
+tbl_df = final_df |>
+  filter((series >= 5) & 
+           (series <= 10) & 
+           ((result == "STAR BAKER")|(result == "WINNER"))
+            ) |>
+  select(baker_name, series, episode, result) |>
+  arrange(series, episode)
 
+tbl = as_tibble(tbl_df)
+tbl
+```
 
+For series 6, 7, 8, 9, the winners are predictable since each winner had won at least two `STAR BAKER`s before among past 9 episodes. And for series 5 and 10, especially 10, the winner is surprising because Nancy in Series 5 won only one `STAR BAKER` and David in Series 10 had never won any `STAR BAKER`s in the past 9 episodes and became `WINNER` finally!
 
+## Viewers
 
+```{r message=FALSE}
+gbb_viewers = read_csv("datasets/viewers.csv", na = c("NA",".","")) |>
+  janitor::clean_names() |>
+  mutate(
+    series_5 = round(series_5, 2)
+  )
 
+head(gbb_viewers, 10)
+```
 
+```{r}
+mean_1 = gbb_viewers |>
+  pull(series_1) |>
+  mean()
+
+mean_5 = gbb_viewers |>
+  pull(series_5) |>
+  mean()
+```
+
+The average viewership in Season 1 is `r mean_1`. The average viewership in Season 5 is `r mean_5`
